@@ -169,8 +169,6 @@ function menu:open(action)
 	self.cursor_a = 0
 end
 
---comment for github
-
 function menu:close()
 	deli(active_menus)
 	self.cursor = 1
