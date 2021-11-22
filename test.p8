@@ -1,6 +1,10 @@
 pico-8 cartridge // http://www.pico-8.com
 version 32
 __lua__
+
+item_bank = {{name = "orange", description = "named after the color. \n(+15 HP)", battle_only = false, 
+	use = function() party_status:open({on_click = function(party_m) party_m.hp = min(party_m.hp+15,party_m.max_hp) party_status:change_to() end, mouse_over = function() end}) end}
+	}
 function _init()
 	poke4(0x5600,0x0005.0803)
 	poke4(0x5708,0x307.0301,0x.0001)
@@ -48,7 +52,7 @@ function _draw()
 	palt(3,true)
 	spr(5,44,36,5,6)
 ]]
-print("\#0"..stat(1),0,0,7)
+--print("\#0"..stat(1),0,0,7)
 end
 
 function inset_number(value) --makes a number always take 3 characters
@@ -56,10 +60,16 @@ function inset_number(value) --makes a number always take 3 characters
 	return sub(z,#tostr(value))..value
 end
 
+change_equipment = function(hero,key,equipment)
+		local a = hero[key]
+		hero[key] = equipment
+		return a
+	end
+
 wayne = {
 	name = "wayne",
 	max_hp = 100,
-	hp = 100,
+	hp = 75,
 	max_mp = 100,
 	mp = 100,
 	attack = 30,
@@ -67,18 +77,13 @@ wayne = {
 	weapon = {name = "penny", description = {"penny (atk +1):","worth one cent in a","foreign currency."}},
 	armor = {name = "galoshes", description = {"galoshes (hp +10):","protects you against wet","feet, but not much else."}},
 	spells = {},
-	status = {},
-	change_equipment = function(self,key,equipment)
-		local a = self[key]
-		self[key] = equipment
-		return a
-	end
+	status = {}
 
 }
 dedesmuln = {
 	name = "dedesmuln",
 	max_hp = 90,
-	hp = 90,
+	hp = 80,
 	max_mp = 100,
 	mp = 100,
 	attack = 30,
@@ -87,11 +92,6 @@ dedesmuln = {
 	armor = nil,
 	spells = {},
 	status = {},
-	change_equipment = function(self,key,equipment)
-		local a = self[key]
-		self[key] = equipment
-		return a
-	end
 }
 pongorma = {
 	name = "pongorma",
@@ -105,11 +105,6 @@ pongorma = {
 	armor = nil,
 	spells = {},
 	status = {},
-	change_equipment = function(self,key,equipment)
-		local a = self[key]
-		self[key] = equipment
-		return a
-	end
 }
 somsnosa = {
 	name = "somsnosa",
@@ -123,11 +118,6 @@ somsnosa = {
 	armor = nil,
 	spells = {},
 	status = {},
-	change_equipment = function(self,key,equipment)
-		local a = self[key]
-		self[key] = equipment
-		return a
-	end
 }
 
 party = {wayne,dedesmuln,pongorma,somsnosa}
@@ -199,7 +189,9 @@ function menu:draw()
 	draw_panel(self)
 end
 
-inventory = {48, 8, 95, 43}
+inventory = {48, 8, 95, 43, {"items",1},
+	{{item_bank[1].name, function() item_bank[1].use() end, function() text_box:draw(item_bank[1].description) end}}
+	}
 inventory = menu:new(unpack(inventory))
 
 actor_stats = {0,0,55,35}
@@ -255,7 +247,7 @@ function weapon_select:update_contents()
 	
 	for c in all(weapons.contents) do
 		add(self.contents,{c.name,function(actor)
-			local b = actor:change_equipment("weapon",c)
+			local b = change_equipment(actor,"weapon",c)
 			
 			add(weapons.contents, b)
 			del(weapons.contents, c)
@@ -266,7 +258,7 @@ function weapon_select:update_contents()
 			function() text_box:draw(unpack(c.description)) end})
 	end
 	add(self.contents,{"",function(actor)
-		local b = actor:change_equipment("weapon",c)
+		local b = change_equipment(actor,"weapon",c)
 		
 		add(weapons.contents, b)
 		del(weapons.contents, c)
@@ -288,7 +280,7 @@ function armor_select:update_contents()
 	
 	for c in all(armor.contents) do
 		add(self.contents,{c.name,function(actor)
-			local b = actor:change_equipment("armor",c)
+			local b = change_equipment(actor,"armor",c)
 			
 			add(armor.contents, b)
 			del(armor.contents, c)
@@ -299,7 +291,7 @@ function armor_select:update_contents()
 			function() text_box:draw(unpack(c.description)) end})
 	end
 	add(self.contents,{"",function(actor)
-		local b = actor:change_equipment("armor",c)
+		local b = change_equipment(actor,"armor",c)
 		
 		add(armor.contents, b)
 		del(armor.contents, c)
@@ -330,17 +322,31 @@ function party_status:change_to()
 	local p = {}
 	for i = 1, #party do
 		add(p,{sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].max_hp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].max_mp),
-		function(submenu)
-			submenu:open() end,
-		function(submenu) 
-			submenu:change_to(party[i])
-			submenu:draw()end
+		function(action)
+			action.on_click(party[i]) end,
+		function(action) 
+			action.mouse_over(party[i]) end
 		})
 	end
 	self.contents = p
 end
 party_status:change_to() --good lord is there a better way to handle this?
 
+--party status comes into play when any party member needs to be selected for any reason.
+--equipment, spells menu, submenus that change
+--items use, spells casting don't have sub-menus
+
+--things that party_status menu can do
+actor_equipment_sel = {on_click = function()
+			actor_equipment:open() end,
+		mouse_over = function(party_m) 
+			actor_equipment:change_to(party_m)
+			actor_equipment:draw() end}
+spellbook_sel = {on_click = function()
+			spellbook:open() end,
+		mouse_over = function(party_m) 
+			spellbook:change_to(party_m)
+			spellbook:draw() end}
 
 command = {8,
 	8,
@@ -349,8 +355,8 @@ command = {8,
 	{"command",1},
 	{
 		{"item",function() inventory:open() end, function() draw_panel(inventory) end},
-		{"equip",function() party_status:open(actor_equipment) end},
-		{"spell",function() party_status:open(spellbook) end},
+		{"equip",function() party_status:open(actor_equipment_sel) end},
+		{"spell",function() party_status:open(spellbook_sel) end},
 		{"system",function() extcmd("pause") end}
 	},
 	{party_status}
