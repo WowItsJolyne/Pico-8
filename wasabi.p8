@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 33
 __lua__
---wasabi
+--wasab
 
 function _init()
  palt(0,false)
