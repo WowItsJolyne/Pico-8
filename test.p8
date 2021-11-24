@@ -17,6 +17,7 @@ function _init()
     party_status:init()
     weapons:init()
     armor:init()
+	inventory:init()
 end
 
 function _update60()
@@ -106,8 +107,9 @@ armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprote
 spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", out_battle = function(party_m) end},
 			s02 = {name = "sneeze", cost = 1, description = "does nothing", out_battle = function(party_m) end}}
 
-item_data = {i01 = {name = "peach"},
-			i02 = {name = "grape"},}
+item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nheals for 20 pts"},
+			i02 = {name = "grape", description = "where are your\nfriends, little guy?\nheals 1 pt"},
+			i03 = {name = "pizza", description = "topped with papaya, pork\nrinds, boysenberry yogurt\nand marshmallows.\nheals whole party 30 pts"}}
 -->
 --menu
 
@@ -363,8 +365,28 @@ function spellbook:init(actor)
 end
 
 inventory = menu:new(48, 8, 95, 43, 
-    {"items",1}
+    {"items",1},
+	{{id = "i01", q = 2},
+	{id = "i02", q = 1},
+	{id = "i03", q = 1}}
 )
+function inventory:init()
+	local cont = {}
+	for c in all(self.contents) do
+		add(cont,{
+			text = string_value(item_data[c.id].name,c.q,9),
+			id = c.id,
+			q = c.q,
+			on_click = function(party_m)
+				item_data[c.id].out_battle(party_m)
+			end,
+			mouse_over = function()
+				text_box:draw(item_data[c.id].description)
+			end
+		})
+	end
+	self.contents = cont
+end
 
 party_status = menu:new(0, 92, 127, 127,
 	{"name",1,"hp",6,"mp",14,"status",22}
