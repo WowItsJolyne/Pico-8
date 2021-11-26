@@ -1,10 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
-version 32
+version 33
 __lua__
 
-item_bank = {{name = "orange", description = "named after the color. \n(+15 HP)", battle_only = false, 
-	use = function() party_status:open({on_click = function(party_m) party_m.hp = min(party_m.hp+15,party_m.max_hp) party_status:change_to() end, mouse_over = function() end}) end}
-	}
 function _init()
 	poke4(0x5600,0x0005.0803)
 	poke4(0x5708,0x307.0301,0x.0001)
@@ -14,13 +11,19 @@ function _init()
 	poke4(0x5728,0x000f.0f00)
 	poke4(0x5730,0x0007.0700)
 
+    active_menus = {}
 
+    --on opening save
+    party_status:init()
+    weapons:init()
+    armor:init()
+	inventory:init()
 end
 
 function _update60()
 	if #active_menus == 0 then
-		if btnp(4) then
-			command:open()
+		if btnp(5) then
+		command:open()
 		end
 	else
 		active_menus[#active_menus]:update()
@@ -36,71 +39,44 @@ function _draw()
 		m:draw()
 	end
 	
-	--print("\14\34",64,119)
---[[
-	draw_panel(move)
-	print("attack\nspells\nitem\ndefend",8,100)
-	draw_panel(enemy)
-	print("dragon\ndragon\ndragon\ndragon",48,100,7)
-	print("1\n1\n1\n1",116,100)
-	draw_panel(battle)
-	print("name\nname\nname\nname",8,8,7)
-	print("100/100\n100/100\n100/100\n100/100",28,8)
-	print("100/100\n100/100\n100/100\n100/100",60,8)
-	print("\n\nligma\nsleepy",92,8)
-	palt(0,false)
-	palt(3,true)
-	spr(5,44,36,5,6)
-]]
---print("\#0"..stat(1),0,0,7)
+print("\#0"..stat(1),0,0,7)
 end
-
-function inset_number(value) --makes a number always take 3 characters
-	local z = "00"
-	return sub(z,#tostr(value))..value
-end
-
-change_equipment = function(hero,key,equipment)
-		local a = hero[key]
-		hero[key] = equipment
-		return a
-	end
 
 wayne = {
 	name = "wayne",
-	max_hp = 100,
+	maxhp = 100,
 	hp = 75,
-	max_mp = 100,
+	maxmp = 100,
 	mp = 100,
-	attack = 30,
-	agility = 30,
-	weapon = {name = "penny", description = {"penny (atk +1):","worth one cent in a","foreign currency."}},
-	armor = {name = "galoshes", description = {"galoshes (hp +10):","protects you against wet","feet, but not much else."}},
-	spells = {},
+	power = 30,
+	speed = 30,
+	weapon = "w01",
+	armor = "a01",
+	spells = {"s01","s02"},
 	status = {}
 
 }
 dedesmuln = {
 	name = "dedesmuln",
-	max_hp = 90,
+	maxhp = 90,
 	hp = 80,
-	max_mp = 100,
+	maxmp = 100,
 	mp = 100,
-	attack = 30,
-	agility = 30,
+	power = 30,
+	speed = 30,
 	weapon = nil,
 	armor = nil,
-	spells = {},
+	spells = {"s02"},
 	status = {},
 }
 pongorma = {
 	name = "pongorma",
-	max_hp = 100,
+	maxhp = 100,
 	hp = 100,
-	max_mp = 90,
+	maxmp = 90,
 	mp = 90,
-	attack = 30,
-	agility = 30,
+	power = 30,
+	speed = 30,
 	weapon = nil,
 	armor = nil,
 	spells = {},
@@ -108,12 +84,12 @@ pongorma = {
 }
 somsnosa = {
 	name = "somsnosa",
-	max_hp = 90,
+	maxhp = 90,
 	hp = 90,
-	max_mp = 90,
+	maxmp = 90,
 	mp = 90,
-	attack = 30,
-	agility = 30,
+	power = 30,
+	speed = 30,
 	weapon = nil,
 	armor = nil,
 	spells = {},
@@ -122,17 +98,22 @@ somsnosa = {
 
 party = {wayne,dedesmuln,pongorma,somsnosa}
 
-armor = {
-	name = "armor",
-	contents = {{name = "stinky hat", description = {"stinky hat (hp +10) (agi +5):","valuable looking, if","it weren't for the smell..."}}}
-}
+weapon_data = {w01 = {name = "penny", description = "penny (pow +1):\nworth one cent in a\nforeign currency.", stats = {0,0,1,0}},
+            w02 = {name = "big fork", description = "big fork (pow +20): don't\ntry to eat a salad with\nthis, you may hurt yourself.",stats = {0,0,20,0}}}
 
-weapons = {
-	name = "weapons",
-	contents = {{name = "big fork", description = {"big fork (atk +20): don't","try to eat a salad with","this, you may hurt yourself."}}}
-}
+armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprotects you against wet\nfeet, but not much else.",stats = {10,0,0,0}},
+            a02 = {name = "stinky hat", description = "stinky hat (hp +10) (spd +5):\nvaluable looking, if\nit weren't for the smell...\n...what is it?",stats = {10,0,0,5}}}
 
-active_menus = {}
+spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", out_battle = function(party_m) end},
+			s02 = {name = "sneeze", cost = 1, description = "does nothing", out_battle = function(party_m) end}}
+
+item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nheals for 20 pts"},
+			i02 = {name = "grape", description = "where are your\nfriends, little guy?\nheals 1 pt"},
+			i03 = {name = "pizza", description = "topped with papaya, pork\nrinds, boysenberry yogurt\nand marshmallows.\nheals whole party 30 pts"}}
+-->
+--menu
+
+cursor_misstroke = 0
 
 menu = {
 	cursor = 1,
@@ -157,10 +138,12 @@ function menu:open(action)
 	add(active_menus, self)
 	self.action = action or self.action
 	self.cursor_a = 0
+	if (cursor_misstroke != 0) self.cursor = cursor_misstroke
 end
 
 function menu:close()
 	deli(active_menus)
+	if (#active_menus != 0) cursor_misstroke = self.cursor
 	self.cursor = 1
 	self.cursor_a = 15
 end
@@ -170,199 +153,288 @@ function menu:update()
 	if btnp(2) and #self.contents > 0 then
 		self.cursor = (self.cursor-2)%#self.contents+1
 		self.cursor_a = 0
+		cursor_misstroke = 0
 	elseif btnp(3) and #self.contents > 0 then
 		self.cursor = self.cursor%#self.contents+1
 		self.cursor_a = 0
-	elseif btnp(4) then
+		cursor_misstroke = 0
+	elseif btnp(5) then
 		self:close()
-	elseif btnp(5) and #self.contents > 0 and self.contents[self.cursor][2] then
+	elseif btnp(4) and #self.contents > 0 and self.contents[self.cursor].on_click then
 		self.cursor_a = 0
-		self.contents[self.cursor][2](self.action)
+		self.contents[self.cursor].on_click(self.action)
+		self.cursor = min(self.cursor,#self.contents)
 	end
 end
 
 function menu:draw()
-	if #self.contents > 0 and self.contents[self.cursor][3] and active_menus[#active_menus] == self then self.contents[self.cursor][3](self.action) end
+	if #self.contents > 0 and self.contents[self.cursor].mouse_over and active_menus[#active_menus] == self then 
+        self.contents[self.cursor].mouse_over(self.action) 
+    end
 	for s in all(self.sub_panels) do
 		draw_panel(s)
 	end
 	draw_panel(self)
 end
 
-inventory = {48, 8, 95, 43, {"items",1},
-	{{item_bank[1].name, function() item_bank[1].use() end, function() text_box:draw(item_bank[1].description) end}}
-	}
-inventory = menu:new(unpack(inventory))
-
-actor_stats = {0,0,55,35}
-actor_stats = menu:new(unpack(actor_stats))
-function actor_stats:change_to(actor)
-	if actor != self.action then 
-		self.action = actor or self.action
-		self.title = {actor.name,1}
-		self.contents[1] = {"maxhp: "..actor.max_hp}
-		self.contents[2] = {"maxmp: "..actor.max_mp}
-		self.contents[3] = {"power: "..actor.attack}
-		self.contents[4] = {"speed: "..actor.agility}
-	end
-end
-
-actor_equipment = {0, 36, 55, 59,
-	{"equipment",1},
-	{{"",function(actor) weapon_select:open(actor) end,
-		function() 
-			weapon_select:draw() end},
-	{"",function(actor) armor_select:open(actor) end,
-	function() 
-		armor_select:draw() end}
-	},
-	{actor_stats}
-}
-actor_equipment = menu:new(unpack(actor_equipment))
-function actor_equipment:change_to(actor)
-		self.action = actor or self.action
-		self.contents[1] = {(self.action.weapon and self.action.weapon.name or ""), 
-		function() 
-			weapon_select:open(self.action) end,
-		function() 
-			weapon_select:draw() end}
-		self.contents[2] = {(self.action.armor and self.action.armor.name or ""), 
-		function() 
-			armor_select:open(self.action) end,
-		function() 
-			armor_select:draw() end}
-	for s in all(self.sub_panels) do --do NOT let this circular reference
-		s:change_to(self.action)
-	end
-end
-
-weapon_select = {72,0,127,91,
-	{"weapons",1},
-	{},
-	{},
-}
-weapon_select = menu:new(unpack(weapon_select))
-function weapon_select:update_contents()
-	self.contents = {}
-	
-	for c in all(weapons.contents) do
-		add(self.contents,{c.name,function(actor)
-			local b = change_equipment(actor,"weapon",c)
-			
-			add(weapons.contents, b)
-			del(weapons.contents, c)
-			
-			weapon_select:update_contents()
-			actor_equipment:change_to()
-			end,
-			function() text_box:draw(unpack(c.description)) end})
-	end
-	add(self.contents,{"",function(actor)
-		local b = change_equipment(actor,"weapon",c)
-		
-		add(weapons.contents, b)
-		del(weapons.contents, c)
-		weapon_select:update_contents()
-		actor_equipment:change_to()
-	end,
-		function() end})
-end
-weapon_select:update_contents()
-
-armor_select = {72,0,127,91,
+armor = menu:new(72,0,127,91,
 	{"armor",1},
-	{},
-	{},
-}
-armor_select = menu:new(unpack(armor_select))
-function armor_select:update_contents()
-	self.contents = {}
-	
-	for c in all(armor.contents) do
-		add(self.contents,{c.name,function(actor)
-			local b = change_equipment(actor,"armor",c)
+	{{id = "a02",q=2}}
+)
+function armor:init()
+	local cont = {}
+	for c in all(self.contents) do
+		if c.id == nil then
+			del(self.contents,c)
+		else
+		add(cont,{text = string_value(armor_data[c.id].name,c.q,11),
+		id = c.id,
+		q = c.q,
+        on_click = function(actor)
+			local a_con = armor.contents
+            local b = actor.armor
+			actor.armor = c.id
 			
-			add(armor.contents, b)
-			del(armor.contents, c)
+			if b != nil then
+				local a = find_index_id(b,a_con)
+				if a != false then
+					a_con[a].q += 1
+				else
+					add(a_con,{id = b, q = 1})
+				end
+			end
 			
-			armor_select:update_contents()
-			actor_equipment:change_to()
+			local i = find_index_id(c.id,a_con)
+			a_con[i].q -= 1
+            if a_con[i].q == 0 then deli(a_con,i) end
+
+			armor:init()
+			equipment:init()
 			end,
-			function() text_box:draw(unpack(c.description)) end})
+			
+        mouse_over = function() text_box:draw(armor_data[c.id].description) end})
+		end
 	end
-	add(self.contents,{"",function(actor)
-		local b = change_equipment(actor,"armor",c)
+	
+	add(cont,{text = "",
+        on_click = function(actor)
+		local b = actor.armor
+		actor.armor = nil
 		
-		add(armor.contents, b)
-		del(armor.contents, c)
-		armor_select:update_contents()
-		actor_equipment:change_to()
-	end,
-		function() end})
-end
-armor_select:update_contents()
+		if b != nil then
+			local a = find_index_id(b,armor.contents)
+			if a != false then
+				armor.contents[a].q += 1
+			else
+				add(armor.contents,{id = b,q = 1})
+			end
+		end
 
-spellbook = {0,0,51,91,
-}
-spellbook = menu:new(unpack(spellbook))
-function spellbook:change_to(actor)
-	if actor != self.action then 
-		self.action = actor
-		self.title = {actor.name,1}
+		armor:init()
+		equipment:init()
+	end,
+	mouse_over = function() end})
+	self.contents = cont
+end
+
+weapons = menu:new(72,0,127,91,
+	{"weapons",1},
+    {{id = "w02", q = 1},
+	{id = "w01", q = 1}}--very necessary. null option for removing equipment
+)
+function weapons:init()
+	local cont = {}
+	for c in all(self.contents) do
+		if c.id == nil then
+			del(self.contents,c)
+		else
+		add(cont,{text = string_value(weapon_data[c.id].name,c.q,11),
+		id = c.id,
+		q = c.q,
+        on_click = function(actor)
+			local w_con = weapons.contents
+            local b = actor.weapon
+			actor.weapon = c.id
+			
+			if b != nil then
+				local a = find_index_id(b,w_con)
+				if a != false then
+					w_con[a].q += 1
+				else
+					add(w_con,{id = b, q = 1})
+				end
+			end
+			
+			local i = find_index_id(c.id,w_con)
+			w_con[i].q -= 1
+            if w_con[i].q == 0 then deli(w_con,i) end
+
+			weapons:init()
+			equipment:init()
+			end,
+			
+        mouse_over = function() text_box:draw(weapon_data[c.id].description) end})
+		end
+	end
+	
+	add(cont,{text = "",
+        on_click = function(actor)
+		local b = actor.weapon
+		actor.weapon = nil
+		
+		if b != nil then
+			local a = find_index_id(b,weapons.contents)
+			if a != false then
+				weapons.contents[a].q += 1
+			else
+				add(weapons.contents,{id = b,q = 1})
+			end
+		end
+
+		weapons:init()
+		equipment:init()
+	end,
+	mouse_over = function() end})
+	self.contents = cont
+end
+
+actor_stats = menu:new(0,0,55,35)
+function actor_stats:init(actor)
+	if actor and actor != self.action then 
+		self.action = actor or self.action
+	end
+	local a = self.action
+	local t0 = {0,0,0,0}
+	local t1 = (a.weapon and weapon_data[a.weapon].stats or t0)
+	local t2 = (a.armor and armor_data[a.armor].stats or t0)
+	local h,m,p,s = a.maxhp,a.maxmp,a.power,a.speed
+	h += t1[1] + t2[1]
+	m += t1[2] + t2[2]
+	p += t1[3] + t2[3]
+	s += t1[4] + t2[4]
+
+	self.title = {self.action.name,1}
+	self.contents = {{text = "maxhp: "..h},
+					{text = "maxmp: "..m},
+					{text = "power: "..p},
+					{text = "speed: "..s}}
+end
+
+equipment = menu:new(0, 36, 55, 59,
+	{"equipment",1},
+	{},
+	{actor_stats}
+)
+function equipment:init(actor)
+    if actor and actor != self.action then
+        self.action = actor
+	end
+	self.contents = {{text = (self.action.weapon and weapon_data[self.action.weapon].name or ""), 
+					on_click = function() 
+						weapons:open(self.action) end,
+					mouse_over = function() 
+						weapons:draw() 
+						if (self.action.weapon) text_box:draw(weapon_data[self.action.weapon].description) 
+					end},
+				{text = (self.action.armor and armor_data[self.action.armor].name or ""), 
+					on_click = function() 
+						armor:open(self.action) end,
+					mouse_over = function() 
+						armor:draw() 
+						if (self.action.armor) text_box:draw(armor_data[self.action.armor].description)
+					end}
+	}
+	for s in all(self.sub_panels) do --do NOT let this circular reference
+		s:init(self.action)
 	end
 end
 
-party_status = {
-	0, 92, 127, 127,
-	{"name",1,"hp",6,"mp",14,"status",22}
-	--contents is currently defined after function party_status:change_to()
-}
-party_status = menu:new(unpack(party_status))
-function party_status:change_to()
-	local p = {}
-	for i = 1, #party do
-		add(p,{sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].max_hp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].max_mp),
-		function(action)
-			action.on_click(party[i]) end,
-		function(action) 
-			action.mouse_over(party[i]) end
+spellbook = menu:new(0,0,51,91)
+function spellbook:init(actor)
+    if actor and actor != self.action then 
+        self.action = actor
+        self.title = {actor.name,1}
+    end
+	self.contents = {}
+	for s in all(self.action.spells) do
+		add(self.contents,{text = string_value(spell_data[s].name,spell_data[s].cost,10),
+			on_click = function(party_m) spell_data[s].out_battle(party_m) end,
+			mouse_over = function() text_box:draw(spell_data[s].description) end
 		})
 	end
-	self.contents = p
 end
-party_status:change_to() --good lord is there a better way to handle this?
 
---party status comes into play when any party member needs to be selected for any reason.
---equipment, spells menu, submenus that change
---items use, spells casting don't have sub-menus
+inventory = menu:new(48, 8, 95, 43, 
+    {"items",1},
+	{{id = "i01", q = 2},
+	{id = "i02", q = 1},
+	{id = "i03", q = 1}}
+)
+function inventory:init()
+	local cont = {}
+	for c in all(self.contents) do
+		add(cont,{
+			text = string_value(item_data[c.id].name,c.q,9),
+			id = c.id,
+			q = c.q,
+			on_click = function(party_m)
+				item_data[c.id].out_battle(party_m)
+			end,
+			mouse_over = function()
+				text_box:draw(item_data[c.id].description)
+			end
+		})
+	end
+	self.contents = cont
+end
 
---things that party_status menu can do
-actor_equipment_sel = {on_click = function()
-			actor_equipment:open() end,
+party_status = menu:new(0, 92, 127, 127,
+	{"name",1,"hp",6,"mp",14,"status",22}
+)
+function party_status:init()
+    local p = {}
+    for i = 1, #party do
+        add(p,{text = sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].maxhp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].maxmp),
+        on_click = function(action)
+            action.on_click(party[i]) end,
+        mouse_over = function(action) 
+            action.mouse_over(party[i]) end
+        })
+    end
+    self.contents = p
+end
+
+equipment_sel = {on_click = function()
+			equipment:open() end,
 		mouse_over = function(party_m) 
-			actor_equipment:change_to(party_m)
-			actor_equipment:draw() end}
+			equipment:init(party_m)
+			equipment:draw() end}
+
 spellbook_sel = {on_click = function()
 			spellbook:open() end,
 		mouse_over = function(party_m) 
-			spellbook:change_to(party_m)
+			spellbook:init(party_m)
 			spellbook:draw() end}
 
-command = {8,
-	8,
-	47,
-	43,
+command = menu:new(8,8,47,43,
 	{"command",1},
-	{
-		{"item",function() inventory:open() end, function() draw_panel(inventory) end},
-		{"equip",function() party_status:open(actor_equipment_sel) end},
-		{"spell",function() party_status:open(spellbook_sel) end},
-		{"system",function() extcmd("pause") end}
+	{   {text = "item", on_click = function() inventory:open() end, mouse_over = function() draw_panel(inventory) end},
+		{text = "equip", on_click = function() party_status:open(equipment_sel) end},
+		{text = "spell", on_click = function() party_status:open(spellbook_sel) end},
+		{text = "system", on_click = function() extcmd("pause") end}
 	},
-	{party_status}
-}
-command = menu:new(unpack(command))
+    {party_status}
+)
 
+function find_index_id(id,table)
+    for i = 1, #table do
+        if (table[i].id == id) return i
+    end
+    return false
+end
+
+--battle menus 
+--[[
 battle = {
 	x1 = 0,
 	y1 = 0,
@@ -384,10 +456,9 @@ enemy = {
 	y1 = 92,
 	x2 = 127,
 	y2 = 127
-}
+}]]
 
-message = "the quick brown fox jumped over the lazy dog. the quick brown fox jumped over the lazy dog. the quick brown fox jumped over the lazy dog."
-
+--display helper functions
 text_box = {
 	x1 = 0,
 	y1 = 92,
@@ -399,60 +470,21 @@ text_box = {
 	line_c = 1
 }
 
-function text_box:update()
-	text[text_c] = text[text_c]..sub(lines[line_c],#text[text_c]+1,#text[text_c]+1)
-	if #lines[line_c] == #text[text_c] then
-		if text_c < 3 and #lines > line_c then
-			text_c = min(3,text_c+1)
-			line_c = min(#lines,line_c+1)
-		elseif btnp(4) or btnp(5) then
-			if #lines > line_c then
-				text = {"","",""}
-				text_c = 1
-				line_c += 1
-			else
-				text_c = 1
-				line_c = 1
-				text = {"","",""}
-				lines = {}
-				text_box_active = false
-			end
-		end
-	elseif btnp(4) or btnp(5) then
-		for i = text_c,3 do
-			text[i] = lines[line_c+i-text_c]
-		end
-		line_c += 3-text_c
-		text_c = 3
-	end
+function text_box:draw(text)
+	draw_panel(self)
+    print(text,8,100,7)
 end
 
-function text_box:draw(line1,line2,line3)
-	draw_panel(text_box)
-	print((line1 and line1 or self.text[1]),8,100,7)
-	print((line2 and line2 or self.text[2]),8,108)
-	print((line3 and line3 or self.text[3]),8,116)
+function inset_number(value) --makes a number always take 3 characters
+	local z = "00"
+	return sub(z,#tostr(value))..value
 end
 
-function text_box:say(message) 
-	local message_c = 1
-	self.lines = {}
-	for i = message_c,#message do
-		if ord(message,i) == 32 then
-			for j = i+1,#message+1 do
-				if j-message_c > 28 then
-					add(self.lines,sub(message,message_c,i-1))
-					message_c = i+1
-					break
-				elseif ord(message,j) == 32 then
-					break
-				end
-			 
-			end
-			
-		end
-	end
-	add(self.lines,sub(message,message_c,#message))
+function string_value(string,value,length)
+	local z = "                "
+	local e = max(0,length-#tostr(value)-1)
+	local s = max(1,length-#string-#tostr(value))
+	return sub(string,1,e)..sub(z,1,s)..value
 end
 
 function draw_panel(tabl)
@@ -477,24 +509,28 @@ function draw_panel(tabl)
 	end
 	if tabl.contents then
 		for i = 1, #tabl.contents do
-			print(tabl.contents[i][1],x1+8,y1+6*(i-1)+8,7) --Maybe change the 6 to tabl.yspacing
+			print(tabl.contents[i].text,x1+8,y1+6*(i-1)+8,7) --Maybe change the 6 to tabl.yspacing
 		end
 	end
 	if tabl.cursor and tabl.cursor_a < 15 then print("\14\33",x1+4,y1+8+6*(tabl.cursor-1),7) end
 end
 
-
-
+function d_b(table,p)
+	print("\#1length: "..#table)
+	for i in all(table) do
+		print("\#1"..i[p])
+	end
+end
 
 __gfx__
-00000000777bb77700000000000000000000000088883333333333c333333333333333333333000000000000000000000000000000000000777bb77700000000
-0000000073bbbbb70000000000000000000000008887883333333c333333333333333333333300000000000000000000000000000000000073bbbbb700000000
-007007007bbbb3b70000000000000000000000008777883333330c33333333333333333333330000000000000000000000000000007007007bbbb3b700000000
-00077000bbbbbbbb000000000000000000000000387778333337cc3333333333333333333333000000000000000000000000000000077000bbbbbbbb00000000
-00077000bbbbbbbb0000000000000000000000003888778333334cccc9933333333333333333000000000000000000000000000000077000bbbbbbbb00000000
-007007007b3bbbb700000000000000000000000033388338333344cc00ccc0888333333333330000000000000000000000000000007007007b3bbbb700000000
-000000007bbbbbb7000000000000000000000000333383333833344cccccc2222883333333330000000000000000000000000000000000007bbbbbb700000000
-00000000777bb77700000000000000000000000033333333333333427999c202333883333333000000000000000000000000000000000000777bb77700000000
+000000006666666677777777000000000000000088883333333333c333333333333333333333000000000000000000000000000000000000777bb77700000000
+00000000666666667777777700000000000000008887883333333c333333333333333333333300000000000000000000000000000000000073bbbbb700000000
+00700700666666667777777700000000000000008777883333330c33333333333333333333330000000000000000000000000000007007007bbbb3b700000000
+0007700066666666777777770000000000000000387778333337cc3333333333333333333333000000000000000000000000000000077000bbbbbbbb00000000
+00077000666666667777777700000000000000003888778333334cccc9933333333333333333000000000000000000000000000000077000bbbbbbbb00000000
+007007006666666677777777000000000000000033388338333344cc00ccc0888333333333330000000000000000000000000000007007007b3bbbb700000000
+0000000066666666777777770000000000000000333383333833344cccccc2222883333333330000000000000000000000000000000000007bbbbbb700000000
+000000006666666677777777000000000000000033333333333333427999c202333883333333000000000000000000000000000000000000777bb77700000000
 000000000000000000000000000000000000000033333333333388879990c2208333333333330000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000003333333333333479999900333833333333330000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000003333333333334799090992333333333333330000000000000000000000000000000000000000000000000000
@@ -534,19 +570,19 @@ __gfx__
 0000000000000000000000000000000000000000333333333333333333333333333cc33333330000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000003333333333333333333333333333733333330000000000000000000000000000000000000000000000000000
 __map__
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0201020102010201020102010201020100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0102010201020102010201020102010200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
