@@ -13,20 +13,77 @@ function _update60()
 	update_controller()
  	guy:update()
 
-	 camera_x = approach(camera_x,guy.x+xinput*24-56,2)
-	camera_x = mid(0,camera_x,312)
-	 camera(camera_x)
-end
+	for b in all(blocks) do
+		b:update()
+	end
 
-function _draw()
- 	cls(12)
-	map(0,0,0,0,64,16)
-	guy:draw()
+	if xinput != last_input then
+		target = guy.x+xinput*24-56
+		camera_t = 0
+	end
+	local d = 30
+	local t = camera_t/d
 	
+	camera_x = guy.x+mid(0,target*(1 - (1 - t) * (1 - t)),312)
+	camera_t = min(camera_t+1,d)
+
 	
 end
 
 camera_x = 0
+camera_t = 0
+target = 0
+
+function _draw()
+ 	cls(12)
+	 camera(camera_x)
+	local m = mid(0,56-guy.x,312)
+	map(0,0,0,0,64,16)
+	guy:draw()
+
+	for b in all(blocks) do
+		b:draw()
+	end
+	
+	print(stat(1),0,0,0)
+	print(xinput == last_input)
+end
+
+
+blocks = {}
+block = {state = 0}
+function block:new(x,y,c,s)
+	local obj = {
+		x = x,
+		y = y,
+		c = c,
+		s = s
+	}
+	add(blocks,obj)
+	return setmetatable(obj, {__index = self})
+end
+function block:update()
+
+end
+function block:on_hit()
+	print("\a")
+end
+function block:draw()
+	pal(8,self.c)
+	spr(112,self.x,self.y)
+	pal(8,8)
+end
+
+
+block:new(116,56,11,"e")
+block:new(132,56,11,"e")
+block:new(148,56,11,"e")
+
+block:new(180,40,11,"e")
+
+block:new(276,40,11,"e")
+block:new(292,40,11,"e")
+block:new(308,40,11,"e")
 
 guy = {
 	x = 60,
@@ -81,22 +138,39 @@ function guy:check_solid(ox,oy)
 	ox = ox or 0
 	oy = oy or 0
 
-	for i = (ox + self.x+2) \ 8,(ox + self.x + 10) \ 8 do
-		for j = (oy + self.y)\8,(oy + self.y + 14)\8 do
-			if fget(mget(i, j), 0) and self.vy >= 0  then
-				return true
-			end
-		end
-	end
-	--checks objects for solidity
-	--[[for o in all(objects) do
-		if o.solid and o != self and not o.destroyed and self:overlaps(o, ox, oy) then
+	for i = (ox + self.x+2)>>3&0x8fff,(ox + self.x + 10)>>3&0x8fff do
+		local y = (oy+self.y+14)>>3
+		local j = y&0x7fff
+		if fget(mget(i, j), 0) and j == y and self.vy >= 0 then
 			return true
 		end
-	end]]
+	end
+
+	if mid(30,ox+self.x,372) != ox + self.x then
+		return true
+	end
+	--checks objects for solidity
+	for b in all(blocks) do
+		if self:overlaps(b, ox, oy) then
+			return true
+		end
+	end
 
 	return false
 end
+
+function guy:overlaps(b, ox, oy)
+    if self == b then return false end
+    ox = ox or 0
+    oy = oy or 0
+	if (oy + self.y + 2 == b.y + 8 and ox + self.x + 10 > b.x and ox + self.x + 2 < b.x + 8 and oy == -1) b:on_hit(self)
+    return
+        ox + self.x + 10 > b.x and
+        oy + self.y + 14 > b.y and
+        ox + self.x + 2 < b.x + 8 and
+        oy + self.y + 2 < b.y + 8
+end
+
 
 function guy:update()
 	local on_ground = self:check_solid(0,1)
@@ -126,12 +200,15 @@ end
 
 function guy:draw()
 	spr(self.s,self.x,self.y,1.625,2,self.f)
-	print(self:check_solid(0,1),self.x,self.y-8,0)
+	--print(self:check_solid(0,1),self.x,self.y-8,0)
+	--print(self.vy,56,self.y-8,0)
 end
 
+last_input = 0
 xinput = 0
 
 function update_controller()
+	last_input = xinput
 	xinput = 0
 	if btn(0) then
 		xinput -= 1
