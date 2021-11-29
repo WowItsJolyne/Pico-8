@@ -3,6 +3,10 @@ version 33
 __lua__
 --wasabi
 
+coin = 1000
+fish = 100
+veg = 100
+
 function _init()
 	poke(0x5f5c,255)
 	palt(0,false)
@@ -22,17 +26,30 @@ function _update60()
 	if xinput != last_input then
 		anim(cam,"x",xinput*24-56,300,out_quad)
 	end
-	
 	update_object(cam)
+	update_object(coin_l)
+
+	for a in all(watering_anims) do 
+		a:update()
+	end
+
+	for b in all(blocks) do
+		update_object(b)
+	end
 
 	
 end
 
 cam = {x = -248, a = {}}
 
+trash = {y = 72, a = {}}
+
+coin_l = {y = 5, a = {}, c = {8,7,11},cl = 2}
+
 function _draw()
 	local m = mid(0,cam.x+guy.x,312)
 	camera(m)
+
 	fillp(0x7fdf)
  	rectfill(m+0,0,m+127,127,0xc7)
 	fillp(0xa5a5)
@@ -53,8 +70,13 @@ function _draw()
 	draw_mountain(mo_off+88,5)
 	draw_mountain(mo_off+152,7)
 
-	
+	for i = 1,3 do
+		watering_anims[i]:draw()
+	end
 	map(0,0,0,0,64,16)
+
+	spr(111, 80, trash.y, 1, 2)--trash can
+
 	guy:draw()
 
 	for b in all(blocks) do
@@ -62,8 +84,12 @@ function _draw()
 	end
 	
 	--print(m,m,0,0)
-	print(stat(1),0,0,0)
-	print(xinput == last_input)
+	print(stat(1),m,0,0)
+	print("fish: "..fish)
+	print("veg: "..veg)
+	print("coin: "..coin,m+89,coin_l.y-1,0)
+	print("coin: "..coin,m+91,coin_l.y+1,0)
+	print("coin: "..coin,m+90,coin_l.y,coin_l.c[coin_l.cl&0x7fff])
 
 	
 end
@@ -91,13 +117,17 @@ function draw_mountain(x,s)
 end
 
 blocks = {}
-block = {state = 0, t = 0, a = {}}
-function block:new(x,y,c,s)
+block = {state = 0, t = 0}
+function block:new(x,y,c,s,f,i)
 	local obj = {
 		x = x,
 		y = y,
 		c = c,
-		s = s
+		s = s,
+		f = f,
+		i = i,
+		a = {},
+		base = self
 	}
 	add(blocks,obj)
 	return setmetatable(obj, {__index = self})
@@ -107,7 +137,8 @@ function block:update()
 end
 function block:on_hit(g)
 	g.vy *= -1
-	print("\a")
+	anim(self,"y",self.y-4,5,linear,1,1)
+	self:f(g)
 end
 function block:draw()
 	pal(8,self.c)
@@ -118,16 +149,66 @@ function block:draw()
 	pal(8,8)
 end
 
+water_plot = function(self,g)
+	if (watering_anims[self.i] == nil) watering_anim:new(self.x,self.i)
+end
 
-block:new(116,55,11,"E")
-block:new(132,55,11,"E")
-block:new(148,55,11,"E")
+buy_plot = function(self,g)
+	if coin >= 60 then
+		coin -= 60
+		self.c = 12
+		self.f = water_plot
+		self.s = "W"
+		anim(coin_l,"y",coin_l.y-3,6,linear,1,1)
+		anim(coin_l,"cl",4,6,linear,1,1)
+	else
 
-block:new(180,39,11,"E")
+	end
+	return
+end
+block:new(116,55,10,"B",buy_plot,1)
+block:new(132,55,10,"B",buy_plot,2)
+block:new(148,55,12,"W",water_plot,3)
+
+block:new(180,39,8,"0")
 
 block:new(276,39,11,"E")
-block:new(292,39,11,"E")
-block:new(308,39,11,"E")
+block:new(292,39,10,"B")
+block:new(308,39,10,"B")
+
+watering_anims = {}
+watering_anim = {}
+function watering_anim:new(x,i)
+	local obj = {
+		x = x,
+		t = 0,
+		s = {},
+		base = self
+	}
+	return setmetatable(obj, {__index = self})
+end
+
+
+function watering_anim:update()
+	if self.t%4 == 0 then
+		add(self.s,{x = rnd(8)+self.x, y = 63, v = 0.1})
+	end
+	for ds in all(self.s) do
+		ds.y += ds.v
+		ds.v += 0.1
+	end
+	self.t += 1
+	if self.t == 240 then
+		del(watering_anims,self)
+	end
+end
+
+function watering_anim:draw()
+	for ds in all(self.s) do
+		pset(ds.x,ds.y,1)
+	end
+	print("watering on",self.x,self.y,0)
+end
 
 guy = {
 	x = 248,
@@ -316,6 +397,10 @@ end
 function out_quad(t, b, c, d)
     t /= d
     return -c * t * (t - 2) + b
+end
+
+function linear(t, b, c, d)
+ return c * t / d + b
 end
 __gfx__
 00000000eeeeeeeee0eeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
