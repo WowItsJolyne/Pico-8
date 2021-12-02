@@ -7,6 +7,8 @@ coin = 1000
 fish = 100
 veg = 100
 
+max_capacity = 3
+
 function _init()
 	poke(0x5f5c,255)
 	palt(0,false)
@@ -29,15 +31,27 @@ function _update60()
 	update_object(cam)
 	update_object(coin_l)
 
-	for a in all(watering_anims) do 
-		a:update()
+	for i = 1,3 do
+		if (watering_anims[i]) watering_anims[i]:update()
 	end
+
+	for i = 1,3 do
+		if (plots[i]) plots[i]:update()
+	end
+
+	charge_meter:update()
 
 	for b in all(blocks) do
 		update_object(b)
 	end
 
-	
+	for l in all(label) do
+		if guy.x >= l[1] and guy.x < l[2] and guy.y < l[3] and guy.y > l[3]-24 then
+			current_label = l
+			break
+		end
+		current_label = nil
+	end
 end
 
 cam = {x = -248, a = {}}
@@ -45,6 +59,20 @@ cam = {x = -248, a = {}}
 trash = {y = 72, a = {}}
 
 coin_l = {y = 5, a = {}, c = {8,7,11},cl = 2}
+
+label = {{44,76,88,"go to shop"},
+	{76,84,88,"throw unwanted items here"},
+	{108,124,88,"buy plot: -60"},
+	{124,140,88,"buy plot: -60"},
+	{140,156,88,"plant seed here"},
+	{220,252,88,"wasabi"},
+	{268,284,72,"store items here"},
+	{284,300,72,"buy storage: -50"},
+	{300,316,72,"buy storage: -50"},
+	{332,348,88,"grab bait (7/15)"},
+	{356,372,88,"bring bait here to fish"}
+}
+current_label = nil
 
 function _draw()
 	local m = mid(0,cam.x+guy.x,312)
@@ -71,8 +99,15 @@ function _draw()
 	draw_mountain(mo_off+152,7)
 
 	for i = 1,3 do
-		watering_anims[i]:draw()
+		if (watering_anims[i]) watering_anims[i]:draw()
 	end
+
+	for i = 1,3 do
+		if (plots[i]) plots[i]:draw()
+	end
+
+	charge_meter:draw()
+
 	map(0,0,0,0,64,16)
 
 	spr(111, 80, trash.y, 1, 2)--trash can
@@ -90,8 +125,13 @@ function _draw()
 	print("coin: "..coin,m+89,coin_l.y-1,0)
 	print("coin: "..coin,m+91,coin_l.y+1,0)
 	print("coin: "..coin,m+90,coin_l.y,coin_l.c[coin_l.cl&0x7fff])
+	if current_label then 
+		print(current_label[4],m+32,116,0)
+	end
 
-	
+	--[[for l in all(label) do
+		rect(4+l[1],l[3]-24,3+l[2],l[3],11)
+	end]]
 end
 
 function draw_cloud(x1,y1,w)
@@ -132,14 +172,17 @@ function block:new(x,y,c,s,f,i)
 	add(blocks,obj)
 	return setmetatable(obj, {__index = self})
 end
+
 function block:update()
 
 end
+
 function block:on_hit(g)
 	g.vy *= -1
 	anim(self,"y",self.y-4,5,linear,1,1)
 	self:f(g)
 end
+
 function block:draw()
 	pal(8,self.c)
 	spr(112,self.x,self.y)
@@ -150,31 +193,97 @@ function block:draw()
 end
 
 water_plot = function(self,g)
-	if (watering_anims[self.i] == nil) watering_anim:new(self.x,self.i)
+	if (not watering_anims[self.i]) watering_anim:new(self.x,self.i) plots[self.i]:water()
 end
 
 buy_plot = function(self,g)
-	if coin >= 60 then
-		coin -= 60
+	if make_purchase(60) then
 		self.c = 12
 		self.f = water_plot
 		self.s = "W"
-		anim(coin_l,"y",coin_l.y-3,6,linear,1,1)
-		anim(coin_l,"cl",4,6,linear,1,1)
+		plot:new(self.x, self.i)
 	else
 
 	end
 	return
 end
+
+spawn_customer = function(self)
+	if (tonum(self.s) == 0) return
+	self.s = tostr(tonum(self.s)-1)
+end
+
+store_item = function(self)
+
+end
+
+buy_storage = function(self)
+	if make_purchase(50) then
+		self.c = 11
+		self.f = store_item
+		self.s = "E"
+	end
+end
+
+plots = {}
+plot = {thirst = 0, growth = 0}
+function plot:new(x,i,p)
+	local obj = {
+		x = x,
+		i = i,
+		plant = p or nil,
+		s = 118,
+		base = self
+	}
+	plots[i] = obj
+	return setmetatable(obj, {__index = self})
+end
+
+function plot:update()
+	if self.plant and self.growth < 100 then
+		self.growth = min(100,self.growth+0.11-self.thirst/1000)
+		self.thirst = min(100, self.thirst+0.2)
+	end
+	local g_int = self.growth&0x7fff
+	if g_int == 35 then
+		self.s = 119
+	elseif g_int == 65 then
+		self.s = 120
+	elseif g_int == 100 then
+		self.s = 105
+	end
+end
+
+function plot:draw()
+	if (not self.plant) return
+	if self.growth < 100 then
+		spr(self.s,self.x, 80)
+	else
+		spr(self.s,self.x,72,1,2)
+	end
+	print(self.thirst.." "..self.growth,self.x, 20,0)
+end
+
+function plot:water()
+	self.thirst = 0
+end
+
+plot:new(148,3,"raddish")
+
 block:new(116,55,10,"B",buy_plot,1)
 block:new(132,55,10,"B",buy_plot,2)
 block:new(148,55,12,"W",water_plot,3)
 
-block:new(180,39,8,"0")
+spawn_block = block:new(180,39,8,"0",spawn_customer)
+function spawn_block:inc()
+	if (tonum(self.s) == max_capacity) return false
+	self.s = tostr(tonum(self.s)+1)
+	return true
+end
 
-block:new(276,39,11,"E")
-block:new(292,39,10,"B")
-block:new(308,39,10,"B")
+block:new(276,39,11,"E",store_item,1)
+block:new(292,39,10,"B",buy_storage,2)
+block:new(308,39,10,"B",buy_storage,3)
 
 watering_anims = {}
 watering_anim = {}
@@ -183,8 +292,10 @@ function watering_anim:new(x,i)
 		x = x,
 		t = 0,
 		s = {},
+		i = i,
 		base = self
 	}
+	watering_anims[i] = obj
 	return setmetatable(obj, {__index = self})
 end
 
@@ -199,7 +310,7 @@ function watering_anim:update()
 	end
 	self.t += 1
 	if self.t == 240 then
-		del(watering_anims,self)
+		watering_anims[self.i] = nil
 	end
 end
 
@@ -207,7 +318,25 @@ function watering_anim:draw()
 	for ds in all(self.s) do
 		pset(ds.x,ds.y,1)
 	end
-	print("watering on",self.x,self.y,0)
+	print(self.t,self.x,self.y,0)
+end
+
+charge_meter = {
+	x = 212,
+	y = 59,
+	t = 0
+}
+
+function charge_meter:update()
+	self.t = min(self.t+1,100)
+	if self.t == 100 then
+		if (spawn_block:inc()) self.t = 0
+	end
+end
+
+function charge_meter:draw()
+	rect(self.x-1,self.y-9,self.x+1,self.y+1,0)
+	line(self.x,self.y-self.t/12.5,self.x,self.y,11)
 end
 
 guy = {
@@ -331,6 +460,19 @@ function guy:update()
 	
 end
 
+function make_purchase(g)
+	if coin >= g then
+		coin -= g
+		anim(coin_l,"y",coin_l.y-3,6,linear,1,1)
+		anim(coin_l,"cl",4,6,linear,1,1)
+		return true
+	end
+
+	anim(coin_l,"y",coin_l.y-3,6,linear,1,1)
+	anim(coin_l,"cl",1,6,linear,1,1)
+	return false
+end
+
 function guy:draw()
 	spr(self.s,self.x,self.y,1.75,2,self.f)
 	--print(self:check_solid(0,1),self.x,self.y-8,0)
@@ -451,22 +593,22 @@ d4225555555555d4eee04444474447474747474744440eeeeee06666666044440444406666660eee
 d4dd4444444445d4eee04444444747774747477744440eeeeee066666660444a0a44406666660eee000000000000000000000000000000000000000000000000
 d4d44444444445d4eee07777477447474774474447770eeeeee06666666044440444406666660eee000000000000000000000000000000000000000000000000
 d4ddddddddddddd4eee07777744444444444444477770eeeeee06666666044440444406666660eee000000000000000000000000000000000000000000000000
-eee0000000000eeeeee07777777777777777777777770eeeee7e7e7eeeeeeeefefefefef000000000000000000000000000000000000000000000000eeeeeeee
-ee077777777770eeeee04444444444444444444444440eeee7e7e7e7eeeeeefefefefefe000000000000000000000000000000000000000000000000eeeeeeee
-ee060066660060eeeee04444444400000000044444440eee7e7e7e7eeeeeefefefefefef000000000000000000000000000000000000000000000000eeeeeeee
-ee006600006600eeeee04444444011111111104444440eeee7e7e7e7eeeefefefefefefe000000000000000000000000000000000000000000000000eeeeeeee
-ee0d00dddd00d0eeeee04444444011111111104444440eee7e7e7e7eeeefefefefefefef000000000000000000000000000000000000000000000000ee0e00ee
-ee06d666666d60eeeee04444444011111111104444440eeee7e7e7e7eefefefefefefefe000000000000000000000000000000000000000000000000e050770e
-ee06d666666d60eeeee04444444011111111104444440eee7e7e7e7eefefefefefefefef000000000000000000000000000000000000000000000000e000000e
-ee0dddddddddd0eeeee04444444011111111104444440eeee7e7e7eefefefefefefefefe00000000000000000000000000000000000000000000000007777770
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007567560
-08888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006666660
-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e055550e
+eee0000000000eeeeee07777777777777777777777770eeeee7e7e7eeeeeeeefefefefefeeeeeeee0000000000000000000000000000000000000000eeeeeeee
+ee077777777770eeeee04444444444444444444444440eeee7e7e7e7eeeeeefefefefefeeeeeeeee0000000000000000000000000000000000000000eeeeeeee
+ee060066660060eeeee04444444400000000044444440eee7e7e7e7eeeeeefefefefefefeeeeeeee0000000000000000000000000000000000000000eeeeeeee
+ee006600006600eeeee04444444011111111104444440eeee7e7e7e7eeeefefefefefefeee00e00e0000000000000000000000000000000000000000eeeeeeee
+ee0d00dddd00d0eeeee04444444011111111104444440eee7e7e7e7eeeefefefefefefefe0bb0bb00000000000000000000000000000000000000000ee0e00ee
+ee06d666666d60eeeee04444444011111111104444440eeee7e7e7e7eefefefefefefefeee0bbb0e0000000000000000000000000000000000000000e050770e
+ee06d666666d60eeeee04444444011111111104444440eee7e7e7e7eefefefefefefefefeee0b0ee0000000000000000000000000000000000000000e000000e
+ee0dddddddddd0eeeee04444444011111111104444440eeee7e7e7eefefefefefefefefeeee0b0ee000000000000000000000000000000000000000007777770
+000000000000000000000000000000000000000000000000eeeeeeeeeeeeeeeeee00e00eeee0b0ee000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeee0bb0bb0eee0b0ee000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeee0bbb0eee00b00e000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeeee0b0eee0777770000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeeee0b0eee0667770000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eeeeeeeeeee0e0eeeee0b0eee0777770000000000000000000000000000000000000000007567560
+088888800000000000000000000000000000000000000000eee00eeeee0b0b0eeee0b0eee0777660000000000000000000000000000000000000000006666660
+000000000000000000000000000000000000000000000000ee0440eeeee0b0eeeee0b0eee06777700000000000000000000000000000000000000000e055550e
 __gff__
 0000000000000000000000000000000000000000000000000000000000000000010101000000000000000000000000000101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
