@@ -32,7 +32,7 @@ function _update60()
 end
 
 function _draw()
-	cls(0)
+	cls(6)
 	map(0,0,0,0,16,16)
 	
 	for m in all(active_menus) do
@@ -107,9 +107,33 @@ armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprote
 spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", out_battle = function(party_m) end},
 			s02 = {name = "sneeze", cost = 1, description = "does nothing", out_battle = function(party_m) end}}
 
-item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nheals for 20 pts"},
-			i02 = {name = "grape", description = "where are your\nfriends, little guy?\nheals 1 pt"},
-			i03 = {name = "pizza", description = "topped with papaya, pork\nrinds, boysenberry yogurt\nand marshmallows.\nheals whole party 30 pts"}}
+item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nheals for 20 pts", target = "single", 
+	out_battle = function(party_m) 
+		if (not find_index_id("i01",inventory)) return --this kinda stuff could be set in inventory:init
+		party_m.hp = min(party_m.hp+20,party_m.maxhp) 
+		use_item("i01") --also can be set in inventory:init
+	end},
+			i02 = {name = "grape", description = "where are your\nfriends, little guy?\nheals 1 pt", target = "single", 
+	out_battle = function(party_m) 
+		if (not find_index_id("i02",inventory)) return 
+		party_m.hp = min(party_m.hp+1,party_m.maxhp) 
+		use_item("i02") 
+	end},
+			i03 = {name = "pizza", description = "topped with papaya, pork\nrinds, boysenberry yogurt\nand marshmallows.\nheals whole party 30 pts", target = "group", 
+	out_battle = function() 
+		if (not find_index_id("i03",inventory)) return 
+		for p in all(party) do
+			p.hp = min(p.hp+30,p.maxhp)
+		end
+		use_item("i03")
+	end}
+	}
+
+function use_item(id)
+	inventory:remove_item(id) 
+	inventory:init() 
+	party_status:init() 
+end
 -->
 --menu
 
@@ -148,6 +172,21 @@ function menu:close()
 	self.cursor_a = 15
 end
 
+function menu:add_item(b) --for menus with quantized items
+	local a = find_index_id(b,self)
+	if a != false then
+		self.contents[a].q += 1
+	else
+		add(self.contents,{id = b, q = 1})
+	end
+end
+
+function menu:remove_item(b)
+ 	local i = find_index_id(b,self)
+	self.contents[i].q -= 1
+	if (self.contents[i].q == 0) deli(self.contents,i)
+end
+
 function menu:update()
 	self.cursor_a = (self.cursor_a+1)%30
 	if btnp(2) and #self.contents > 0 then
@@ -168,13 +207,13 @@ function menu:update()
 end
 
 function menu:draw()
-	if #self.contents > 0 and self.contents[self.cursor].mouse_over and active_menus[#active_menus] == self then 
-        self.contents[self.cursor].mouse_over(self.action) 
-    end
 	for s in all(self.sub_panels) do
 		draw_panel(s)
 	end
 	draw_panel(self)
+	if #self.contents > 0 and self.contents[self.cursor].mouse_over and active_menus[#active_menus] == self then 
+        self.contents[self.cursor].mouse_over(self.action) 
+    end
 end
 
 armor = menu:new(72,0,127,91,
@@ -196,17 +235,10 @@ function armor:init()
 			actor.armor = c.id
 			
 			if b != nil then
-				local a = find_index_id(b,a_con)
-				if a != false then
-					a_con[a].q += 1
-				else
-					add(a_con,{id = b, q = 1})
-				end
+				armor:add_item(b)
 			end
 			
-			local i = find_index_id(c.id,a_con)
-			a_con[i].q -= 1
-            if a_con[i].q == 0 then deli(a_con,i) end
+			armor:remove_item(c.id)
 
 			armor:init()
 			equipment:init()
@@ -222,12 +254,7 @@ function armor:init()
 		actor.armor = nil
 		
 		if b != nil then
-			local a = find_index_id(b,armor.contents)
-			if a != false then
-				armor.contents[a].q += 1
-			else
-				add(armor.contents,{id = b,q = 1})
-			end
+			armor:add_item(b)
 		end
 
 		armor:init()
@@ -257,17 +284,10 @@ function weapons:init()
 			actor.weapon = c.id
 			
 			if b != nil then
-				local a = find_index_id(b,w_con)
-				if a != false then
-					w_con[a].q += 1
-				else
-					add(w_con,{id = b, q = 1})
-				end
+				weapons:add_item(b)
 			end
 			
-			local i = find_index_id(c.id,w_con)
-			w_con[i].q -= 1
-            if w_con[i].q == 0 then deli(w_con,i) end
+			weapons:remove_item(c.id)
 
 			weapons:init()
 			equipment:init()
@@ -283,12 +303,7 @@ function weapons:init()
 		actor.weapon = nil
 		
 		if b != nil then
-			local a = find_index_id(b,weapons.contents)
-			if a != false then
-				weapons.contents[a].q += 1
-			else
-				add(weapons.contents,{id = b,q = 1})
-			end
+			weapons:add_item(b)
 		end
 
 		weapons:init()
@@ -367,25 +382,42 @@ end
 inventory = menu:new(48, 8, 95, 43, 
     {"items",1},
 	{{id = "i01", q = 2},
-	{id = "i02", q = 1},
-	{id = "i03", q = 1}}
+	--{id = "i03", q = 1},
+	{id = "i02", q = 2}}
 )
 function inventory:init()
 	local cont = {}
 	for c in all(self.contents) do
-		add(cont,{
+		local item = {
 			text = string_value(item_data[c.id].name,c.q,9),
 			id = c.id,
 			q = c.q,
-			on_click = function(party_m)
-				item_data[c.id].out_battle(party_m)
-			end,
 			mouse_over = function()
 				text_box:draw(item_data[c.id].description)
 			end
-		})
+		}
+		if item_data[c.id].target == "single" then
+			item.on_click = function(party_m)
+				party_status:open({on_click = item_data[c.id].out_battle, mouse_over = function() end})
+			end
+		elseif item_data[c.id].target == "group" then
+			item.on_click = function(party_m)
+				party_status:open({
+					on_click = item_data[c.id].out_battle, 
+					mouse_over = function()
+						if party_status.cursor_a < 15 then 
+							for i = 1, #party do
+								print("\14\33",4,94+6*i,7)
+							end
+						end
+					end
+				})
+			end
+		end
+		add(cont,item)
 	end
 	self.contents = cont
+	self.cursor = min(self.cursor,#self.contents)
 end
 
 party_status = menu:new(0, 92, 127, 127,
@@ -427,8 +459,8 @@ command = menu:new(8,8,47,43,
 )
 
 function find_index_id(id,table)
-    for i = 1, #table do
-        if (table[i].id == id) return i
+    for i = 1, #table.contents do
+        if (table.contents[i].id == id) return i
     end
     return false
 end
@@ -512,7 +544,7 @@ function draw_panel(tabl)
 			print(tabl.contents[i].text,x1+8,y1+6*(i-1)+8,7) --Maybe change the 6 to tabl.yspacing
 		end
 	end
-	if tabl.cursor and tabl.cursor_a < 15 then print("\14\33",x1+4,y1+8+6*(tabl.cursor-1),7) end
+	if tabl.cursor and tabl.cursor_a < 15 then print("\14\33",x1+4,y1+2+6*tabl.cursor,7) end
 end
 
 function d_b(table,p)
