@@ -60,16 +60,16 @@ trash = {y = 72, a = {}}
 
 coin_l = {y = 5, a = {}, c = {8,7,11},cl = 2}
 
-label = {{44,76,88,"go to shop"},
+label = {{44,76,88,"go to shop","\|fX"},
 	{76,84,88,"throw unwanted items here"},
-	{108,124,88,"buy plot: -60"},
-	{124,140,88,"buy plot: -60"},
-	{140,156,88,"plant seed here"},
+	{108,124,88,"buy plot: -60","^"},
+	{124,140,88,"buy plot: -60","^"},
+	{140,156,88,"plant seed here","^"},
 	{220,252,88,"wasabi"},
 	{268,284,72,"store items here"},
-	{284,300,72,"buy storage: -50"},
-	{300,316,72,"buy storage: -50"},
-	{332,348,88,"grab bait (7/15)"},
+	{284,300,72,"buy storage: -50","^"},
+	{300,316,72,"buy storage: -50","^"},
+	{332,348,88,"grab bait (7/15)","\|fX"},
 	{356,372,88,"bring bait here to fish"}
 }
 current_label = nil
@@ -125,14 +125,39 @@ function _draw()
 	print("coin: "..coin,m+89,coin_l.y-1,0)
 	print("coin: "..coin,m+91,coin_l.y+1,0)
 	print("coin: "..coin,m+90,coin_l.y,coin_l.c[coin_l.cl&0x7fff])
+
 	if current_label then 
-		print(current_label[4],m+32,116,0)
+		printc(current_label[4],m+64,116,7)
+		if #current_label > 4 then 
+			button:draw(current_label[5],m)
+		end
 	end
 
 	--[[for l in all(label) do
 		rect(4+l[1],l[3]-24,3+l[2],l[3],11)
 	end]]
 end
+
+button = {
+	x = 57,
+	y = 98,
+	c = 9,
+	t = 0,
+	draw = function(self,letter,m)
+		self.t = (self.t+1)%60
+		if self.t >= 30 then
+			pal(9,(letter == "^" and 12 or 8))
+			spr(115,self.x+m,self.y,2,1)
+			print(letter,self.x+6+m,self.y+3,7)
+			pal(9,9)
+		else
+			spr(115,self.x+m,self.y+2,2,1)
+			print(letter,self.x+6+m,self.y+5,7)
+		end
+		spr(113,self.x+m,self.y+7,2,1)
+
+	end
+}
 
 function draw_cloud(x1,y1,w)
 	for i = 1,w,6 do
@@ -202,15 +227,12 @@ buy_plot = function(self,g)
 		self.f = water_plot
 		self.s = "W"
 		plot:new(self.x, self.i)
+		label[2+self.i][4] = "plant seed here"
+		label[2+self.i][5] = nil
 	else
 
 	end
 	return
-end
-
-spawn_customer = function(self)
-	if (tonum(self.s) == 0) return
-	self.s = tostr(tonum(self.s)-1)
 end
 
 store_item = function(self)
@@ -222,6 +244,8 @@ buy_storage = function(self)
 		self.c = 11
 		self.f = store_item
 		self.s = "E"
+		label[6+self.i][4] = "store items here"
+		label[6+self.i][5] = nil
 	end
 end
 
@@ -274,12 +298,20 @@ block:new(116,55,10,"B",buy_plot,1)
 block:new(132,55,10,"B",buy_plot,2)
 block:new(148,55,12,"W",water_plot,3)
 
+spawn_customer = function(self)
+	if (self.s == "0") return
+	charge_meter.t -= 100
+	self.s = tostr(tonum(self.s)-1)
+	self.c = (self.s == "0" and 8 or 10)
+end
+
 spawn_block = block:new(180,39,8,"0",spawn_customer)
 function spawn_block:inc()
-	if (tonum(self.s) == max_capacity) return false
-	self.s = tostr(tonum(self.s)+1)
-	return true
+	if (tonum(self.s) != max_capacity) self.s = tostr(tonum(self.s)+1)
+	self.c = (tonum(self.s) != max_capacity and 10 or 11)
 end
+
+
 
 block:new(276,39,11,"E",store_item,1)
 block:new(292,39,10,"B",buy_storage,2)
@@ -328,15 +360,17 @@ charge_meter = {
 }
 
 function charge_meter:update()
-	self.t = min(self.t+1,100)
-	if self.t == 100 then
-		if (spawn_block:inc()) self.t = 0
+	self.t = min(self.t+1,100*max_capacity)
+	if self.t%100 == 0 then
+		spawn_block:inc()
 	end
 end
 
 function charge_meter:draw()
-	rect(self.x-1,self.y-9,self.x+1,self.y+1,0)
-	line(self.x,self.y-self.t/12.5,self.x,self.y,11)
+	line(self.x,self.y-10,self.x,self.y,7)
+	line(self.x,self.y-((self.t-1)%100)/10,self.x,self.y,(self.t == 100*max_capacity and 11 or 8))
+	rect(self.x-1,self.y-11,self.x+1,self.y,0)
+	--print(self.t,self.x,self.y-18,0)
 end
 
 guy = {
@@ -497,6 +531,10 @@ function approach(x, target, max_delta)
 	return x < target and min(x + max_delta, target) or max(x - max_delta, target)
 end
 
+function printc(string,x,y,c)
+	print(string,x-(#string<<1),y,c)
+end
+
 -- animation module
 -- by efofeckss
 
@@ -601,14 +639,14 @@ ee0d00dddd00d0eeeee04444444011111111104444440eee7e7e7e7eeeefefefefefefefe0bb0bb0
 ee06d666666d60eeeee04444444011111111104444440eeee7e7e7e7eefefefefefefefeee0bbb0e0000000000000000000000000000000000000000e050770e
 ee06d666666d60eeeee04444444011111111104444440eee7e7e7e7eefefefefefefefefeee0b0ee0000000000000000000000000000000000000000e000000e
 ee0dddddddddd0eeeee04444444011111111104444440eeee7e7e7eefefefefefefefefeeee0b0ee000000000000000000000000000000000000000007777770
-000000000000000000000000000000000000000000000000eeeeeeeeeeeeeeeeee00e00eeee0b0ee000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeee0bb0bb0eee0b0ee000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeee0bbb0eee00b00e000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeeee0b0eee0777770000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eeeeeeeeeeeeeeeeeee0b0eee0667770000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eeeeeeeeeee0e0eeeee0b0eee0777770000000000000000000000000000000000000000007567560
-088888800000000000000000000000000000000000000000eee00eeeee0b0b0eeee0b0eee0777660000000000000000000000000000000000000000006666660
-000000000000000000000000000000000000000000000000ee0440eeeee0b0eeeee0b0eee06777700000000000000000000000000000000000000000e055550e
+00000000e13eeeeeeeee31eeeeee9999999eeeee00000000eeeeeeeeeeeeeeeeee00e00eeee0b0ee000000000000000000000000000000000000000007567560
+08888880e1133333333311eeeee997777799eeee00000000eeeeeeeeeeeeeeeee0bb0bb0eee0b0ee000000000000000000000000000000000000000007567560
+08888880e1111111111111eeeee979999979eeee00000000eeeeeeeeeeeeeeeeee0bbb0eee00b00e000000000000000000000000000000000000000007567560
+08888880ee11111111111eeeeee999999999eeee00000000eeeeeeeeeeeeeeeeeee0b0eee0777770000000000000000000000000000000000000000007567560
+08888880eeeeeeeeeeeeeeeeeee999999999eeee00000000eeeeeeeeeeeeeeeeeee0b0eee0667770000000000000000000000000000000000000000007567560
+08888880eeeeeeeeeeeeeeeeeee999999999eeee00000000eeeeeeeeeee0e0eeeee0b0eee0777770000000000000000000000000000000000000000007567560
+08888880eeeeeeeeeeeeeeeeeee999999999eeee00000000eee00eeeee0b0b0eeee0b0eee0777660000000000000000000000000000000000000000006666660
+00000000eeeeeeeeeeeeeeeeeee999999999eeee00000000ee0440eeeee0b0eeeee0b0eee06777700000000000000000000000000000000000000000e055550e
 __gff__
 0000000000000000000000000000000000000000000000000000000000000000010101000000000000000000000000000101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
