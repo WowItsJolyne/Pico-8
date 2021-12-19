@@ -20,6 +20,9 @@ end
 function _update60()
 	update_controller()
  	guy:update()
+	if btnp(5) and current_label != nil and #current_label == 6 and current_label[5] == "\|fX" then
+		label_func[current_label[6]]()
+	end
 
 	for b in all(blocks) do
 		b:update()
@@ -45,22 +48,24 @@ function _update60()
 		update_object(b)
 	end
 
-	for l in all(label) do
+	for i = 1, #label do
+		local l = label[i]
 		if guy.x >= l[1] and guy.x < l[2] and guy.y < l[3] and guy.y > l[3]-24 then
 			current_label = l
+			current_label_i =  i
 			break
 		end
 		current_label = nil
 	end
 end
 
-cam = {x = -248, a = {}}
+cam = {x = -248, y = 0, a = {}}
 
 trash = {y = 72, a = {}}
 
 coin_l = {y = 5, a = {}, c = {8,7,11},cl = 2}
 
-label = {{44,76,88,"go to shop","\|fX"},
+label = {{44,76,88,"go to shop","\|fX","goto_basement"},
 	{76,84,88,"throw unwanted items here"},
 	{108,124,88,"buy plot: -60","^"},
 	{124,140,88,"buy plot: -60","^"},
@@ -72,11 +77,24 @@ label = {{44,76,88,"go to shop","\|fX"},
 	{332,348,88,"grab bait (7/15)","\|fX"},
 	{356,372,88,"bring bait here to fish"}
 }
+
+label_func = {goto_basement = function() guy.x = 64
+	guy.y = 216
+	cam.x = 0
+	cam.y = 128 end,
+	harvest_crop = function() --this isn't working right now
+		plots[current_label_i-2].plant = nil
+		label[current_label_i][4] = "plant seed here"
+		label[current_label_i][6] = nil
+	end}
+
 current_label = nil
+current_label_i = 0
 
 function _draw()
+	cls()
 	local m = mid(0,cam.x+guy.x,312)
-	camera(m)
+	camera(m,cam.y)
 
 	fillp(0x7fdf)
  	rectfill(m+0,0,m+127,127,0xc7)
@@ -117,11 +135,18 @@ function _draw()
 	for b in all(blocks) do
 		b:draw()
 	end
-	
-	--print(m,m,0,0)
+
+	print(m,m,0,0)
 	print(stat(1),m,0,0)
-	print("fish: "..fish)
-	print("veg: "..veg)
+
+	line(11+m,5,21+m,5,7)
+	line(10+m,5,10+fish\10+m,5,8)
+	rect(10+m,4,21+m,6,0)
+
+	line(11+m,13,21+m,13,7)
+	line(10+m,13,10+veg\10+m,13,8)
+	rect(10+m,12,21+m,14,0)
+
 	print("coin: "..coin,m+89,coin_l.y-1,0)
 	print("coin: "..coin,m+91,coin_l.y+1,0)
 	print("coin: "..coin,m+90,coin_l.y,coin_l.c[coin_l.cl&0x7fff])
@@ -129,7 +154,18 @@ function _draw()
 	if current_label then 
 		printc(current_label[4],m+64,116,7)
 		if #current_label > 4 then 
-			button:draw(current_label[5],m)
+			local letter = current_label[5]
+
+			if time()%1 >= 0.5 then
+				pal(9,(letter == "^" and 12 or 8))
+				spr(115,57+m,98,2,1)
+				print(letter,63+m,101,7)
+				pal(9,9)
+			else
+				spr(115,57+m,100,2,1)
+				print(letter,63+m,103,7)
+			end
+			spr(113,57+m,105,2,1)
 		end
 	end
 
@@ -275,16 +311,16 @@ function plot:update()
 		self.s = 120
 	elseif g_int == 100 then
 		self.s = 105
+		label[2+self.i][4] = "ready for harvest"
+		label[2+self.i][5] = "^"
+		label[2+self.i][6] = "harvest_crop"
 	end
 end
 
 function plot:draw()
 	if (not self.plant) return
-	if self.growth < 100 then
+
 		spr(self.s,self.x, 80)
-	else
-		spr(self.s,self.x,72,1,2)
-	end
 	print(self.thirst.." "..self.growth,self.x, 20,0)
 end
 
@@ -484,14 +520,16 @@ function guy:update()
 		self.vy = 0
 	end
 
-	if on_ground and btnp(2) then
-		self.vy = -1.6
+	if btnp(2) then  --jumping or activating event
+		if current_label != nil and #current_label == 6 and current_label[5] == "^" then
+			label_func[current_label[6]]()
+		elseif on_ground and btnp(2) then
+			self.vy = -1.6
+		end
 	end
 
 	self:move_x(self.vx)
 	self:move_y(self.vy)
-
-	
 end
 
 function make_purchase(g)
