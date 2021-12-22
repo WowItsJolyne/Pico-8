@@ -6,8 +6,11 @@ __lua__
 coin = 1000
 fish = 100
 veg = 100
+bait = 7
 
 max_capacity = 3
+wasabi_level = 0
+fish_level = 0
 
 function _init()
 	poke(0x5f5c,255)
