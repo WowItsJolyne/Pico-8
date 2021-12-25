@@ -104,8 +104,18 @@ weapon_data = {w01 = {name = "penny", description = "penny (pow +1):\nworth one 
 armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprotects you against wet\nfeet, but not much else.",stats = {10,0,0,0}},
             a02 = {name = "stinky hat", description = "stinky hat (hp +10) (spd +5):\nvaluable looking, if\nit weren't for the smell...\n...what is it?",stats = {10,0,0,5}}}
 
-spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", out_battle = function(party_m) end},
-			s02 = {name = "sneeze", cost = 1, description = "does nothing", out_battle = function(party_m) end}}
+spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", target = "single", cost = 10,
+	out_battle = function(party_m)
+		party_m.hp = min(flr(party_m.maxhp*0.3)+party_m.hp,party_m.maxhp)
+		party_m.mp -= spell_data["s01"].cost
+		cast_spell("s01")
+	end},
+			s02 = {name = "sneeze", cost = 1, description = "does nothing", 
+	out_battle = function(party_m)
+		party_m.mp -= spell_data["s02"].cost
+		cast_spell("s02")
+	end}
+	}
 
 item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nheals for 20 pts", target = "single", 
 	out_battle = function(party_m) 
@@ -128,6 +138,11 @@ item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nh
 		use_item("i03")
 	end}
 	}
+
+function cast_spell(id)
+	spellbook:init()
+	party_status:init()
+end
 
 function use_item(id)
 	inventory:remove_item(id) 
@@ -370,13 +385,35 @@ function spellbook:init(actor)
         self.action = actor
         self.title = {actor.name,1}
     end
-	self.contents = {}
+	local cont = {}
 	for s in all(self.action.spells) do
-		add(self.contents,{text = string_value(spell_data[s].name,spell_data[s].cost,10),
-			on_click = function(party_m) spell_data[s].out_battle(party_m) end,
+		local item = {
+			text = string_value(spell_data[s].name,spell_data[s].cost,10),
+			id = s,
 			mouse_over = function() text_box:draw(spell_data[s].description) end
-		})
+		}
+		if spell_data[s].target == "single" then
+			item.on_click = function(party_m)
+				party_status:open({on_click = spell_data[s].out_battle, mouse_over = function() end})
+			end
+		elseif spell_data[s].target == "group" then
+			item.on_click = function(party_m)
+				party_status:open({
+					on_click = item_data[c.id].out_battle, 
+					mouse_over = function()
+						if party_status.cursor_a < 15 then 
+							for i = 1, #party do
+								print("\14\33",4,94+6*i,7)
+							end
+						end
+					end
+				})
+			end
+		end
+		add(cont,item)
 	end
+	self.contents = cont
+	self.cursor = mid(self.cursor,#self.contents,1)
 end
 
 inventory = menu:new(48, 8, 95, 43, 
@@ -417,7 +454,7 @@ function inventory:init()
 		add(cont,item)
 	end
 	self.contents = cont
-	self.cursor = min(self.cursor,#self.contents)
+	self.cursor = mid(self.cursor,#self.contents,1)
 end
 
 party_status = menu:new(0, 92, 127, 127,
