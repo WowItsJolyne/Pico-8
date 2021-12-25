@@ -79,7 +79,7 @@ pongorma = {
 	speed = 30,
 	weapon = nil,
 	armor = nil,
-	spells = {},
+	spells = {"s02","s03"},
 	status = {},
 }
 somsnosa = {
@@ -107,13 +107,16 @@ armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprote
 spell_data = {s01 = {name = "heal", cost = 30, description = "heals you for 30% and guards", target = "single", cost = 10,
 	out_battle = function(party_m)
 		party_m.hp = min(flr(party_m.maxhp*0.3)+party_m.hp,party_m.maxhp)
-		party_m.mp -= spell_data["s01"].cost
-		cast_spell("s01")
+		--party_m.mp -= spell_data["s01"].cost
 	end},
 			s02 = {name = "sneeze", cost = 1, description = "does nothing", 
 	out_battle = function(party_m)
-		party_m.mp -= spell_data["s02"].cost
-		cast_spell("s02")
+	end},
+			s03 = {name = "group heal", cost = 80, description = "heals the whole party\nfor 30%", target = "group", cost = 90,
+	out_battle = function(party_m)
+		for p in all(party) do
+			p.hp = min(flr(p.maxhp*0.3)+p.hp,p.maxhp)
+		end
 	end}
 	}
 
@@ -138,11 +141,6 @@ item_data = {i01 = {name = "peach", description = "it's a good kind of fuzzy.\nh
 		use_item("i03")
 	end}
 	}
-
-function cast_spell(id)
-	spellbook:init()
-	party_status:init()
-end
 
 function use_item(id)
 	inventory:remove_item(id) 
@@ -392,14 +390,23 @@ function spellbook:init(actor)
 			id = s,
 			mouse_over = function() text_box:draw(spell_data[s].description) end
 		}
+
+		local cast_spell = function(party_l)
+			party_m.mp -= spell_data[s].cost
+			spell_data[s].out_battle(party_l)
+			spellbook:init()
+			party_status:init()
+		end
+
 		if spell_data[s].target == "single" then
 			item.on_click = function(party_m)
-				party_status:open({on_click = spell_data[s].out_battle, mouse_over = function() end})
+				party_status:open({
+					on_click = function(party_l) party_m.mp -= spell_data[s].cost spell_data[s].out_battle(party_l) end, mouse_over = function() end})
 			end
 		elseif spell_data[s].target == "group" then
 			item.on_click = function(party_m)
 				party_status:open({
-					on_click = item_data[c.id].out_battle, 
+					on_click = function(party_l) party_m.mp -= spell_data[s].cost spell_data[s].out_battle(party_l) end, 
 					mouse_over = function()
 						if party_status.cursor_a < 15 then 
 							for i = 1, #party do
@@ -409,6 +416,8 @@ function spellbook:init(actor)
 					end
 				})
 			end
+		else
+			item.on_click = function(party_m) party_m.mp -= spell_data[s].cost spell_data[s].out_battle() end
 		end
 		add(cont,item)
 	end
