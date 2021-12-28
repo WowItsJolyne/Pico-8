@@ -33,7 +33,7 @@ end
 
 function _draw()
 	cls(6)
-	map(0,0,0,0,16,16)
+	--map(0,0,0,0,16,16)
 	
 	for m in all(active_menus) do
 		m:draw()
@@ -213,9 +213,10 @@ function menu:update()
 	elseif btnp(5) then
 		self:close()
 	elseif btnp(4) and #self.contents > 0 and self.contents[self.cursor].on_click then
-		self.cursor_a = 0
 		self.contents[self.cursor].on_click(self.action)
 		self.cursor = min(self.cursor,#self.contents)
+		self.cursor_a = 0
+		cursor_misstroke = 0
 	end
 end
 
@@ -391,8 +392,12 @@ function spellbook:init(actor)
 			mouse_over = function() text_box:draw(spell_data[s].description) end
 		}
 
+		if self.action.mp < spell_data[s].cost then
+			item.c = 6
+		end
+
 		local cast_spell = function(party_l)
-			party_m.mp -= spell_data[s].cost
+			self.action.mp -= spell_data[s].cost
 			spell_data[s].out_battle(party_l)
 			spellbook:init()
 			party_status:init()
@@ -401,12 +406,12 @@ function spellbook:init(actor)
 		if spell_data[s].target == "single" then
 			item.on_click = function(party_m)
 				party_status:open({
-					on_click = function(party_l) party_m.mp -= spell_data[s].cost spell_data[s].out_battle(party_l) end, mouse_over = function() end})
+					on_click = cast_spell, mouse_over = function() end})
 			end
 		elseif spell_data[s].target == "group" then
 			item.on_click = function(party_m)
 				party_status:open({
-					on_click = function(party_l) party_m.mp -= spell_data[s].cost spell_data[s].out_battle(party_l) end, 
+					on_click = cast_spell, 
 					mouse_over = function()
 						if party_status.cursor_a < 15 then 
 							for i = 1, #party do
@@ -417,7 +422,7 @@ function spellbook:init(actor)
 				})
 			end
 		else
-			item.on_click = function(party_m) party_m.mp -= spell_data[s].cost spell_data[s].out_battle() end
+			item.on_click = cast_spell
 		end
 		add(cont,item)
 	end
@@ -585,9 +590,10 @@ function draw_panel(tabl)
 			print("\#0"..title[i],x1+title[i+1]*4+4,y1+1,7)
 		end
 	end
-	if tabl.contents then
-		for i = 1, #tabl.contents do
-			print(tabl.contents[i].text,x1+8,y1+6*(i-1)+8,7) --Maybe change the 6 to tabl.yspacing
+	local contents = tabl.contents
+	if contents then
+		for i = 1, #contents do
+			print(contents[i].text,x1+8,y1+6*(i-1)+8,(contents[i].c or 7)) --Maybe change the 6 to tabl.yspacing
 		end
 	end
 	if tabl.cursor and tabl.cursor_a < 15 then print("\14\33",x1+4,y1+2+6*tabl.cursor,7) end
