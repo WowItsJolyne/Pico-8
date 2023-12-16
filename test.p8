@@ -172,10 +172,11 @@ function menu:new(x1,y1,x2,y2,title,contents,sub_panels)
 end
 
 function menu:open(action)
-	add(active_menus, self)
-	self.action = action or self.action
-	self.cursor_a = 0
-	if (cursor_misstroke != 0) self.cursor = cursor_misstroke
+	local obj = self
+	add(active_menus, obj)
+	obj.action = action or self.action
+	obj.cursor_a = 0
+	if (cursor_misstroke != 0) obj.cursor = cursor_misstroke
 end
 
 function menu:close()
@@ -397,23 +398,24 @@ function spellbook:init(actor)
 		end
 
 		local cast_spell = function(party_l)
+			if (self.action.mp < spell_data[s].cost) return
 			self.action.mp -= spell_data[s].cost
 			spell_data[s].out_battle(party_l)
 			spellbook:init()
-			party_status:init()
+			party_cast:init()
 		end
 
 		if spell_data[s].target == "single" then
 			item.on_click = function(party_m)
-				party_status:open({
+				party_cast:open({
 					on_click = cast_spell, mouse_over = function() end})
 			end
 		elseif spell_data[s].target == "group" then
 			item.on_click = function(party_m)
-				party_status:open({
+				party_cast:open({
 					on_click = cast_spell, 
 					mouse_over = function()
-						if party_status.cursor_a < 15 then 
+						if party_cast.cursor_a < 15 then 
 							for i = 1, #party do
 								print("\14\33",4,94+6*i,7)
 							end
@@ -474,7 +476,24 @@ end
 party_status = menu:new(0, 92, 127, 127,
 	{"name",1,"hp",6,"mp",14,"status",22}
 )
-function party_status:init()
+party_status.init = function(self)
+    local p = {}
+    for i = 1, #party do
+        add(p,{text = sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].maxhp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].maxmp),
+        on_click = function(action)
+            action.on_click(party[i]) end,
+        mouse_over = function(action) 
+            action.mouse_over(party[i]) end
+        })
+    end
+    self.contents = p
+end
+
+party_cast = menu:new(0, 92, 127, 127, --same shi as party_status because i had issues where i overwrote party_status while casting a spell and that messed up earlier stuff in the menu chain
+{"name",1,"hp",6,"mp",14,"status",22}
+)
+
+party_cast.init = function(self)
     local p = {}
     for i = 1, #party do
         add(p,{text = sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].maxhp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].maxmp),
