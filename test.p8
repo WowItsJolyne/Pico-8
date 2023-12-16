@@ -15,20 +15,41 @@ function _init()
 
     --on opening save
     party_status:init()
+	party_cast:init() 
     weapons:init()
     armor:init()
 	inventory:init()
 end
 
 function _update60()
-	if #active_menus == 0 then
-		if btnp(5) then
-		command:open()
+	if #active_menus > 0 then
+		active_menus[#active_menus]:update()
+		
+	elseif say_active then
+		if #say_string == say_counter then
+			if (btnp(4) or btnp(5)) say_active = false
+		else
+			say_counter += .5
 		end
 	else
-		active_menus[#active_menus]:update()
+		if btnp(5) then
+			command:open()
+		end
+		if btnp(4) then
+			say("this is a test for a text box\n\nwith scrolling text\n\nand more...?")
+		end
 	end
 
+end
+
+say_active = false
+say_counter = 0
+say_string = ""
+
+function say(string)
+	say_active = true
+	say_counter = 1
+	say_string = string
 end
 
 function _draw()
@@ -37,6 +58,9 @@ function _draw()
 	
 	for m in all(active_menus) do
 		m:draw()
+	end
+	if say_active then
+		text_box:draw(sub(say_string,1,say_counter))
 	end
 	
 print("\#0"..stat(1),0,0,7)
@@ -98,8 +122,8 @@ somsnosa = {
 
 party = {wayne,dedesmuln,pongorma,somsnosa}
 
-weapon_data = {w01 = {name = "penny", description = "penny (pow +1):\nworth one cent in a\nforeign currency.", stats = {0,0,1,0}},
-            w02 = {name = "big fork", description = "big fork (pow +20): don't\ntry to eat a salad with\nthis, you may hurt yourself.",stats = {0,0,20,0}}}
+weapon_data = {w01 = {name = "penny", description = "penny (pow +1):\n\nworth one cent in a\n\nforeign currency.", stats = {0,0,1,0}},
+            w02 = {name = "big fork", description = "big fork (pow +20): don't\n\ntry to eat a salad with\n\nthis, you may hurt yourself.",stats = {0,0,20,0}}}
 
 armor_data = {a01 = {name = "galoshes", description = "galoshes (hp +10):\nprotects you against wet\nfeet, but not much else.",stats = {10,0,0,0}},
             a02 = {name = "stinky hat", description = "stinky hat (hp +10) (spd +5):\nvaluable looking, if\nit weren't for the smell...\n...what is it?",stats = {10,0,0,5}}}
@@ -476,7 +500,7 @@ end
 party_status = menu:new(0, 92, 127, 127,
 	{"name",1,"hp",6,"mp",14,"status",22}
 )
-party_status.init = function(self)
+function party_status:init()
     local p = {}
     for i = 1, #party do
         add(p,{text = sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].maxhp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].maxmp),
@@ -493,7 +517,7 @@ party_cast = menu:new(0, 92, 127, 127, --same shi as party_status because i had 
 {"name",1,"hp",6,"mp",14,"status",22}
 )
 
-party_cast.init = function(self)
+function party_cast:init()
     local p = {}
     for i = 1, #party do
         add(p,{text = sub(party[i].name,1,4).." "..inset_number(party[i].hp).."/"..inset_number(party[i].maxhp).." "..inset_number(party[i].mp).."/"..inset_number(party[i].maxmp),
@@ -561,9 +585,10 @@ enemy = {
 }]]
 
 --display helper functions
+
 text_box = {
 	x1 = 0,
-	y1 = 92,
+	y1 = 84,
 	x2 = 127,
 	y2 = 127,
 	text = {"","",""},
@@ -574,7 +599,7 @@ text_box = {
 
 function text_box:draw(text)
 	draw_panel(self)
-    print(text,8,100,7)
+    print(text,8,92,7)
 end
 
 function inset_number(value) --makes a number always take 3 characters
