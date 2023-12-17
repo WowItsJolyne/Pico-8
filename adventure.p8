@@ -8,6 +8,15 @@ p = {{x=32,y=5,xv=0, yv=0,
  --fov -> viewing angle
  map_bounds_x = 128
 map_bounds_y = 64
+px = 30
+py = 4
+input_x = 0
+input_y = 0
+dir_stack = {}
+old_input = 0
+movement_lock = false
+pivot_lock = false
+d_angle = 0
 
 scale = -8
 
@@ -79,11 +88,8 @@ function _init()
 
 	guy:new(32,1,0.1)
 	guy:new(32,4,-0.4)
-	guy:new(30,2,0)
-	guy:new(38,3,0,2)
-	guy:new(28,7,0.4)
-	guy:new(30,6,0.3)
-	guy:new(35,2,0,1)
+
+	initialize_scripts()
 	
 	p[1].x = -cos(p[1].hrot)*3 + px
 	p[1].y = -sin(p[1].hrot)*3 + py
@@ -133,6 +139,15 @@ function _update60()
 	p[1].hrotv = 0 ]]
 	local vx,vy = 0,0
 
+	--directional input
+	local d = update_input()
+
+	if (d == nil) then input_x = 0 input_y = 0 end
+	if (d == 0) then input_x = -1 input_y = 0 end
+	if (d == 1) then input_x = 1 input_y = 0 end
+	if (d == 2) then input_x = 0 input_y = 1 end
+	if (d == 3) then input_x = 0 input_y = -1 end
+
 	--player animation
 	player:update()
 	
@@ -150,27 +165,33 @@ function _update60()
 	end
 	if (closest_guy) closest_guy.talkable = true
 
-	if btn(4) then
+	if btnp(5) and closest_guy and closest_guy.script and not script_active then
+		script_run(closest_guy.script)
+	end
+
+	if script_active then
+		script_update()
+	end
+	movement_lock = script_active
+
+	
+	
+	if btn(4) and not pivot_lock then
 		p[1].hrot = pivot_angle(p[1].hrot,(btn(1) and 1 or 0) - (btn(0) and 1 or 0),0.004)
 		p[1].x = -cos(p[1].hrot)*3 + px
 		p[1].y = -sin(p[1].hrot)*3 + py
-	else
-		if btn(0) then
-			vx = -sin(p[1].hrot)*0.05
-			vy = cos(p[1].hrot)*0.05
+		if not movement_lock then
+			vx = cos(p[1].hrot)*0.05*((btn(2) and 1 or 0) - (btn(3) and 1 or 0))
+			vy = sin(p[1].hrot)*0.05*((btn(2) and 1 or 0) - (btn(3) and 1 or 0))
 		end
-		if btn(1) then
-			vx = sin(p[1].hrot)*0.05
-			vy = -cos(p[1].hrot)*0.05
-		end
+	elseif not movement_lock and input_y != 0 then
+		vx = cos(p[1].hrot)*0.05*input_y
+		vy = sin(p[1].hrot)*0.05*input_y
+	elseif not movement_lock and input_x != 0 then
+			vx = sin(p[1].hrot)*0.05*input_x
+			vy = -cos(p[1].hrot)*0.05*input_x
 	end
-	if btn(2) then
-		vx = cos(p[1].hrot)*0.05
-		vy = sin(p[1].hrot)*0.05
-	elseif btn(3) then
-		vx = -cos(p[1].hrot)*0.05
-		vy = -sin(p[1].hrot)*0.05
-	end
+	
 	local fx = px + vx --future x
 	local fy = py + vy --future y
 
@@ -180,9 +201,6 @@ function _update60()
 	cpu = stat(1)
 end 
 
-px = 30
-py = 4
-
 function _draw()
  cls(7)
 	--skybox
@@ -191,12 +209,29 @@ function _draw()
  	draw_track(1,0,32,128,96)
 	--drawing player, always in center of room... unless???
 	
+	if text then
+		rectfill(2,107,125,125,0)
+		print(text, 3,108, text_color)
+	end
+	if responses then
+		local top = 101 - 6 * #responses
+		rectfill(70, top,
+		         125, 105, 0)
+		for i=1, #responses do
+			print(responses[i],
+			      72, top + i*6-4,
+			      i==ans and 7 or 5)
+		end
+	end
 	
 	--debug
 	print(stat(1),0,0,14)
 	?p[1].hrot
-	?p[1].x
-	?p[1].y
+	?tostr(old_input,true)
+	?#dir_stack
+	for d in all(dir_stack) do
+		?d
+	end
 end
 
 --(index of table that represents camera info, topleft corner of screen xy, resolution in pixels xy)
@@ -403,6 +438,149 @@ function find_direction(a)
 		return 1
 	elseif a == mid(-0.125,a,-0.375) then
 		return 0
+	end
+end
+
+function update_input()
+	local dir_input = btn() & 0x000f
+	if dir_input != old_input then
+		local buffer = dir_input
+		dir_input = dir_input ^^ old_input
+		old_input = buffer
+		if #dir_stack == 0 then
+			if btn(3) then dir_input = 3
+			elseif btn(2) then dir_input = 2
+			elseif btn(1) then dir_input = 1
+			elseif btn(0) then dir_input = 0 end
+			add(dir_stack,dir_input)
+		else
+			if dir_input & 0x0001 != 0 then
+				dir_input = 0
+			elseif dir_input & 0x0002 != 0 then
+				dir_input = 1
+			elseif dir_input & 0x0004 != 0 then
+				dir_input = 2
+			else
+				dir_input = 3
+			end
+			for d in all(dir_stack) do
+				if d == dir_input then
+					del(dir_stack,d)
+					if (#dir_stack == 0) return nil
+					return dir_stack[#dir_stack]
+				end
+			end
+			add(dir_stack,dir_input)
+		end
+	end
+	return dir_stack[#dir_stack]
+end
+-->8
+--dialogue by geckojsc
+
+--scripting variables
+text = nil
+text_color = 15
+responses = nil
+ans = 1
+routine = nil
+script_active = false
+
+-- initiate a script
+function script_run(func)
+	routine = cocreate(function()
+		script_active = true
+		func()
+		script_active = false
+	end)
+	coresume(routine)
+end
+
+-- this is called every frame
+-- and player input is ignored,
+-- as long as there is a script
+-- active.
+function script_update()
+	coresume(routine)
+end
+
+-- script commands
+-------------------------------
+
+function reveal_text(str)
+	text = ""
+	for i=1, #str do
+		text = text..sub(str,i,i)
+		yield()
+	end
+end
+
+function say(str)
+	reveal_text(str)
+	repeat
+	 -- every time we call yield()
+	 -- we're saying "that's all
+	 -- for now, come back here
+	 -- next frame"
+		yield()
+	until btnp(5)
+	text = nil
+end
+
+function announce(str)
+	text = str
+	text_color = 12
+	repeat
+		yield()
+	until btnp(5)
+	text = nil
+	text_color = 7
+end
+
+function ask(str, ...)
+	reveal_text(str)
+	responses = {...}
+	ans = 1
+	repeat
+		yield()
+		if btnp(2) and ans > 1 then
+			ans -= 1
+		elseif btnp(3) and ans < #responses then
+			ans += 1
+		end
+	until btnp(5)
+	text = nil
+	responses = nil
+end
+
+--function moveto
+--function moveby
+
+-- execute multiple script
+--  functions at once.
+-- the main script resumes once
+--  all functions are complete
+function simultaneously(...)
+	local routines = {}
+	for f in all{...} do
+		add(routines, cocreate(f))
+	end
+	repeat
+		yield()
+		local complete = true
+		for c in all(routines) do
+			if coresume(c) then
+			 complete = false
+			end
+		end
+	until complete
+end
+
+function initialize_scripts()
+	guys[1].script = function ()
+		say [[
+	whew, desert patrol is hard
+	work!]]
 	end
 end
 __gfx__
