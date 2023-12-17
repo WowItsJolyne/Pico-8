@@ -166,6 +166,9 @@ function _update60()
 	if (closest_guy) closest_guy.talkable = true
 
 	if btnp(5) and closest_guy and closest_guy.script and not script_active then
+		local look_at_each_other = atan2(closest_guy.x-px,closest_guy.y-py)-p[1].hrot
+		closest_guy.angle = norm_angle(look_at_each_other+0.5)
+		player.angle = norm_angle(look_at_each_other)
 		script_run(closest_guy.script)
 	end
 
@@ -173,8 +176,6 @@ function _update60()
 		script_update()
 	end
 	movement_lock = script_active
-
-	
 	
 	if btn(4) and not pivot_lock then
 		p[1].hrot = pivot_angle(p[1].hrot,(btn(1) and 1 or 0) - (btn(0) and 1 or 0),0.004)
@@ -227,11 +228,12 @@ function _draw()
 	--debug
 	print(stat(1),0,0,14)
 	?p[1].hrot
-	?tostr(old_input,true)
-	?#dir_stack
-	for d in all(dir_stack) do
-		?d
-	end
+	?py
+	?px
+	?player.angle
+	?guys[1].angle
+	?atan2(guys[1].x-px,guys[1].y-py)
+
 end
 
 --(index of table that represents camera info, topleft corner of screen xy, resolution in pixels xy)
@@ -368,23 +370,25 @@ angle = 0}
 
 function player:update()
 	
-	if btn(2) then --you can still walk forward and back in pivot mode, so angle changes regardless
+	if btn(2) and not movement_lock then --you can still walk forward and back in pivot mode, so angle changes regardless
 		self.angle = 0
-	elseif btn(3) then
+	elseif btn(3) and not movement_lock  then
 		self.angle = 0.5
 	end
 
 	if btn(4) then
 		self.angle = pivot_angle(self.angle,(btn(0) and 1 or 0) - (btn(1) and 1 or 0),0.004)
-	elseif btn(1) then
+	elseif input_x == 1 and not movement_lock then
 		self.angle = 0.25
-	elseif btn(0) then
+	elseif input_x == -1 and not movement_lock then
 		self.angle = -0.25
 	end
 
 	self.d = find_direction(self.angle)
 	
-	if btn(2) or btn(3) then
+	if movement_lock then
+		self.a = 0
+	elseif btn(2) or btn(3) then
 		self.a = (self.a%4)+0.1
 	elseif btn(4) and (btn(0) or btn(1)) then --if camera is pivoting
 		self.a = 0
@@ -448,31 +452,28 @@ function update_input()
 		dir_input = dir_input ^^ old_input
 		old_input = buffer
 		if #dir_stack == 0 then
-			if btn(3) then dir_input = 3
-			elseif btn(2) then dir_input = 2
-			elseif btn(1) then dir_input = 1
-			elseif btn(0) then dir_input = 0 end
-			add(dir_stack,dir_input)
-		else
-			if dir_input & 0x0001 != 0 then
-				dir_input = 0
-			elseif dir_input & 0x0002 != 0 then
-				dir_input = 1
-			elseif dir_input & 0x0004 != 0 then
-				dir_input = 2
-			else
-				dir_input = 3
-			end
-			for d in all(dir_stack) do
-				if d == dir_input then
-					del(dir_stack,d)
-					if (#dir_stack == 0) return nil
-					return dir_stack[#dir_stack]
+			for i = 0,3 do
+				if btn(i) then
+					add(dir_stack,i)
 				end
 			end
-			add(dir_stack,dir_input)
+		else
+			local push_else_pop = false
+			for i = 0,3 do
+				if dir_input & (0x0001<<i) != 0 then
+					dir_input = i
+					push_else_pop = btn(i)
+					if push_else_pop then
+						add(dir_stack,dir_input)
+					else
+						del(dir_stack,dir_input)
+						del(dir_stack,dir_input) --fix for when an extra input gets in the stack for some reason
+					end
+				end	
+			end
 		end
 	end
+	if (#dir_stack == 0) return nil
 	return dir_stack[#dir_stack]
 end
 -->8
